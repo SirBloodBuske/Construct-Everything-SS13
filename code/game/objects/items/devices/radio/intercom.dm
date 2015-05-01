@@ -1,4 +1,4 @@
-/obj/item/device/radio/intercom
+obj/item/device/radio/intercom
 	name = "station intercom"
 	desc = "Talk through this."
 	icon_state = "intercom"
@@ -12,6 +12,9 @@
 	var/last_tick //used to delay the powercheck
 	var/buildstage = 2 //2 is built, 1 is building, 0 is frame.
 	var/wiresexposed = 0
+	var/wirescut = 0
+
+
 
 /obj/item/weapon/intercom_electronics
 	name = "intercom electronics"
@@ -22,44 +25,55 @@
 	m_amt = 50
 	g_amt = 50
 
-/obj/item/device/radio/intercom/New()
-	..()
+/obj/item/device/radio/intercom/New(loc, dir, building)
 	processing_objects += src
+	if(loc)
+		src.loc = loc
 
-/obj/item/device/radio/intercom/Del()
+	if(dir)
+		src.dir = dir
+
+	if(building)
+		buildstage = 0
+		wiresexposed = 1
+		pixel_x = (dir & 3)? 0 : (dir == 4 ? -24 : 24)
+		pixel_y = (dir & 3)? (dir ==1 ? -24 : 24) : 0
+
+
+
+obj/item/device/radio/intercom/Del()
 	processing_objects -= src
 	..()
-/obj/item/device/radio/intercom/examine()
-	..()
+obj/item/device/radio/intercom/examine()
 	if (buildstage < 2)
 		usr << "<span class='warning'>It is not wired.</span>"
 	if (buildstage < 1)
 		usr << "<span class='warning'>The circuit is missing.</span>"
-/obj/item/device/radio/intercom/update_icon()
+obj/item/device/radio/intercom/update_icon()
 
 	if(wiresexposed)
 		switch(buildstage)
 			if(2)
-				icon_state="intercom"
+				icon_state="intercom-open"
 			if(1)
 				icon_state="intercom-p-open"
 			if(0)
 				icon_state="intercom-frame"
 
-/obj/item/device/radio/intercom/attack_ai(mob/user as mob)
+obj/item/device/radio/intercom/attack_ai(mob/user as mob)
 	src.add_fingerprint(user)
 	spawn (0)
 		attack_self(user)
 
-/obj/item/device/radio/intercom/attack_paw(mob/user as mob)
+obj/item/device/radio/intercom/attack_paw(mob/user as mob)
 	return src.attack_hand(user)
 
-/obj/item/device/radio/intercom/attack_hand(mob/user as mob)
+obj/item/device/radio/intercom/attack_hand(mob/user as mob)
 	src.add_fingerprint(user)
 	spawn (0)
 		attack_self(user)
 
-/obj/item/device/radio/intercom/receive_range(freq, level)
+obj/item/device/radio/intercom/receive_range(freq, level)
 	if (!on)
 		return -1
 	if(!(0 in level))
@@ -71,16 +85,20 @@
 	if(freq in ANTAG_FREQS)
 		if(!(src.syndie))
 			return -1//Prevents broadcast of messages over devices lacking the encryption
-
+	switch(buildstage)
+		if(1)
+			return -1
+		if(0)
+			return -1
 	return canhear_range
 
 
-/obj/item/device/radio/intercom/hear_talk(mob/M as mob, msg)
+obj/item/device/radio/intercom/hear_talk(mob/M as mob, msg)
 	if(!src.anyai && !(M in src.ai))
 		return
 	..()
 
-/obj/item/device/radio/intercom/process()
+obj/item/device/radio/intercom/process()
 	if(((world.timeofday - last_tick) > 30) || ((world.timeofday - last_tick) < 0))
 		last_tick = world.timeofday
 
@@ -108,7 +126,8 @@ obj/item/device/radio/intercom/attackby(obj/item/W as obj, mob/user as mob, para
 		user << "<span class='notice'>The wires have been [wiresexposed ? "exposed" : "unexposed"]</span>"
 		update_icon()
 		return
-
+	else if (wiresexposed && ((istype(W, /obj/item/device/multitool) || istype(W, /obj/item/weapon/wirecutters))))
+		return attack_hand(user)
 	if(wiresexposed)
 		switch(buildstage)
 			if(2)
@@ -118,8 +137,10 @@ obj/item/device/radio/intercom/attackby(obj/item/W as obj, mob/user as mob, para
 					var/obj/item/stack/cable_coil/new_coil = new /obj/item/stack/cable_coil()
 					new_coil.amount = 5
 					new_coil.loc = user.loc
+					wirescut = 1
 					buildstage = 1
 					update_icon()
+
 			if(1)
 				if(istype(W, /obj/item/stack/cable_coil))
 					var/obj/item/stack/cable_coil/coil = W
@@ -131,6 +152,7 @@ obj/item/device/radio/intercom/attackby(obj/item/W as obj, mob/user as mob, para
 					if(!coil.amount)
 						del(coil)
 
+					wirescut = 0
 					buildstage = 2
 					user << "<span class='notice'>You wire \the [src]!</span>"
 					update_icon()
@@ -147,6 +169,7 @@ obj/item/device/radio/intercom/attackby(obj/item/W as obj, mob/user as mob, para
 				if(istype(W, /obj/item/weapon/intercom_electronics))
 					user << "<span class='notice'>You insert the circuit!</span>"
 					del(W)
+					wirescut = 1
 					buildstage = 1
 					update_icon()
 
@@ -156,17 +179,3 @@ obj/item/device/radio/intercom/attackby(obj/item/W as obj, mob/user as mob, para
 					playsound(get_turf(src), 'sound/items/Ratchet.ogg', 50, 1)
 					del(src)
 		return 0
-/obj/item/device/radio/intercom/New(loc, dir, building)
-	..()
-
-	if(loc)
-		src.loc = loc
-
-	if(dir)
-		src.dir = dir
-
-	if(building)
-		buildstage = 0
-		wiresexposed = 1
-		pixel_x = (dir & 3)? 0 : (dir == 4 ? -24 : 24)
-		pixel_y = (dir & 3)? (dir ==1 ? -24 : 24) : 0
