@@ -1,6 +1,5 @@
 /datum/wires/radio
 	holder_type = /obj/item/device/radio
-	holder_type = /obj/item/device/radio/intercom
 	wire_count = 3
 
 var/const/WIRE_SIGNAL = 1
